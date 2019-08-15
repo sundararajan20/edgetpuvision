@@ -315,6 +315,14 @@ def run_pipeline(pipeline, layout, loop, render_overlay, display, handle_sigint=
                     allocation.width, allocation.height)
             return False
 
+        # Listens for and drops RECONFIGURE events from glimagesink to avoid costly memory
+        # reallocations when window size changes. These aren't needed in our use case.
+        def on_event_probe(pad, info, *data):
+            event = info.get_event()
+            if event.type == Gst.EventType.RECONFIGURE:
+                return Gst.PadProbeReturn.DROP
+            return Gst.PadProbeReturn.OK
+
         window = Gtk.Window(Gtk.WindowType.TOPLEVEL)
         window.set_title(WINDOW_TITLE)
         window.set_default_size(layout.render_size.width, layout.render_size.height)
@@ -326,6 +334,7 @@ def run_pipeline(pipeline, layout, loop, render_overlay, display, handle_sigint=
         drawing_area.realize()
 
         glsink = pipeline.get_by_name('glsink')
+        glsink.get_static_pad('sink').add_probe(Gst.PadProbeType.EVENT_UPSTREAM, on_event_probe)
         set_display_contexts(glsink, drawing_area)
         drawing_area.connect('draw', on_widget_draw)
         drawing_area.connect('configure-event', on_widget_configure, glsink)
