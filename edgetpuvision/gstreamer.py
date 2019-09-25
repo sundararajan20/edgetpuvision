@@ -306,13 +306,9 @@ def run_pipeline(pipeline, layout, loop, render_overlay, display, handle_sigint=
     bus.connect('message', on_bus_message, pipeline, loop)
 
     if display is not Display.NONE:
-        # Workaround for https://gitlab.gnome.org/GNOME/gtk/issues/844 in gtk3 < 3.24.
-        widget_draws = 123
-        def on_widget_draw(widget, cairo):
-            nonlocal widget_draws
-            if widget_draws:
-                 widget.queue_draw()
-                 widget_draws -= 1
+        # Needed to commit the wayland sub-surface.
+        def on_gl_draw(sink, context, sample, widget):
+            widget.queue_draw()
             return False
 
         # Needed to account for window chrome etc.
@@ -342,8 +338,8 @@ def run_pipeline(pipeline, layout, loop, render_overlay, display, handle_sigint=
 
         glsink = pipeline.get_by_name('glsink')
         glsink.get_static_pad('sink').add_probe(Gst.PadProbeType.EVENT_UPSTREAM, on_event_probe)
+        glsink.connect('client-draw', on_gl_draw, drawing_area)
         set_display_contexts(glsink, drawing_area)
-        drawing_area.connect('draw', on_widget_draw)
         drawing_area.connect('configure-event', on_widget_configure, glsink)
         window.connect('delete-event', Gtk.main_quit)
         window.show_all()
