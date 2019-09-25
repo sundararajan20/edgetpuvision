@@ -34,8 +34,10 @@ gi.require_version('GLib', '2.0')
 gi.require_version('GObject', '2.0')
 gi.require_version('Gst', '1.0')
 gi.require_version('GstBase', '1.0')
+gi.require_version('GstGL', '1.0')
 gi.require_version('GstPbutils', '1.0')
-from gi.repository import GLib, GObject, Gst, GstBase, Gtk
+gi.require_version('GstVideo', '1.0')
+from gi.repository import GLib, GObject, Gst, GstBase, GstGL, GstVideo, Gtk
 
 GObject.threads_init()
 Gst.init([])
@@ -298,6 +300,11 @@ def run_pipeline(pipeline, layout, loop, render_overlay, display, handle_sigint=
     print(pipeline)
     pipeline = Gst.parse_launch(pipeline)
 
+    # Set up a pipeline bus watch to catch errors.
+    bus = pipeline.get_bus()
+    bus.add_signal_watch()
+    bus.connect('message', on_bus_message, pipeline, loop)
+
     if display is not Display.NONE:
         # Workaround for https://gitlab.gnome.org/GNOME/gtk/issues/844 in gtk3 < 3.24.
         widget_draws = 123
@@ -341,6 +348,23 @@ def run_pipeline(pipeline, layout, loop, render_overlay, display, handle_sigint=
         window.connect('delete-event', Gtk.main_quit)
         window.show_all()
 
+        # The appsink pipeline branch must use the same GL display as the screen
+        # rendering so they get the same GL context. This isn't automatically handled
+        # by GStreamer as we're the ones setting an external display handle.
+        def on_bus_message_sync(bus, message, glsink):
+            if message.type == Gst.MessageType.NEED_CONTEXT:
+                _, context_type = message.parse_context_type()
+                if context_type == GstGL.GL_DISPLAY_CONTEXT_TYPE:
+                    sinkelement = glsink.get_by_interface(GstVideo.VideoOverlay)
+                    gl_context = sinkelement.get_property('context')
+                    if gl_context:
+                        display_context = Gst.Context.new(GstGL.GL_DISPLAY_CONTEXT_TYPE, True)
+                        GstGL.context_set_gl_display(display_context, gl_context.get_display())
+                        message.src.set_context(display_context)
+            return Gst.BusSyncReply.PASS
+
+        bus.set_sync_handler(on_bus_message_sync, glsink)
+
     with Worker(save_frame) as images, Commands() as get_command:
         signals = {'appsink':
             {'new-sample': functools.partial(on_new_sample,
@@ -357,11 +381,6 @@ def run_pipeline(pipeline, layout, loop, render_overlay, display, handle_sigint=
             if component:
                 for signal_name, signal_handler in signals.items():
                     component.connect(signal_name, signal_handler, pipeline)
-
-        # Set up a pipeline bus watch to catch errors.
-        bus = pipeline.get_bus()
-        bus.add_signal_watch()
-        bus.connect('message', on_bus_message, pipeline, loop)
 
         # Handle signals.
         if handle_sigint:
