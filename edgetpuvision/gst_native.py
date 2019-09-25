@@ -239,16 +239,8 @@ class OverlaySource(GstBase.BaseSrc):
             pts = self.pts
             self.svg = None
 
-        # Note: Buffer IS writable (ref is 1 in native land). However gst-python
-        # took an additional ref so it's now 2 and gst_buffer_is_writable
-        # returns false. We can't modify the buffer without fiddling with refcount.
-        assert buf.mini_object.refcount == 2
-        buf.mini_object.refcount = 1
-        try:
-            self.render_svg(svg, buf)
-            buf.pts = pts
-        finally:
-            buf.mini_object.refcount = 2
+        self.render_svg(svg, buf)
+        buf.pts = pts
 
         with self.cond:
             return self.get_flow_return_locked(Gst.FlowReturn.OK)
