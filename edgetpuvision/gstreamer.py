@@ -231,7 +231,7 @@ def on_new_sample(sink, pipeline, render_overlay, layout, images, get_command):
                              command=custom_command)
         overlay = pipeline.get_by_name('overlay')
         if overlay:
-            overlay.set_svg(svg, pts)
+            overlay.emit('queue-svg', svg, pts)
 
         if save_frame:
             images.put((data, layout.inference_size, svg))
