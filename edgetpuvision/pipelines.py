@@ -47,12 +47,10 @@ def inference_pipeline(layout, stillimage=False):
         ]
 
     return [
-        Filter('glfilterbin', filter='glcolorscale'),
-        Caps('video/x-raw', format='RGBA', width=size.width, height=size.height),
-        Filter('videoconvert'),
-        Caps('video/x-raw', format='RGB', width=size.width, height=size.height),
-        Filter('videobox', autocrop=True),
-        Caps('video/x-raw', width=layout.inference_size.width, height=layout.inference_size.height),
+        Filter('glupload'),
+        Filter('glbox'),
+        Filter('gldownload'),
+        Caps('video/x-raw', format='RGB', width=layout.inference_size.width, height=layout.inference_size.height),
         Sink('app', name='appsink', emit_signals=True, max_buffers=1, drop=True, sync=False),
     ]
 
