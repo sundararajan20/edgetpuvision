@@ -266,7 +266,7 @@ def get_pipeline(source, inference_size, display):
     filename = os.path.expanduser(source)
     if os.path.isfile(filename):
         info = get_video_info(filename)
-        render_size = caps_size(info.get_caps())
+        render_size = Size(info.get_width(), info.get_height())
         layout = make_layout(inference_size, render_size)
         return layout, file_pipline(info.is_image(), filename, layout, display)
 
