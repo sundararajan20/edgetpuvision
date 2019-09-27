@@ -47,7 +47,6 @@ from gi.repository import GstPbutils  # Must be called after Gst.init().
 
 from PIL import Image
 
-from .gst_native import set_display_contexts
 from .pipelines import *
 
 COMMAND_SAVE_FRAME = ' '
@@ -178,12 +177,12 @@ def pull_sample(sink):
 
     result, mapinfo = buf.map(Gst.MapFlags.READ)
     if result:
-        yield sample, mapinfo.data, buf.pts
+        yield sample, mapinfo.data
     buf.unmap(mapinfo)
 
 def new_sample_callback(process):
     def callback(sink, pipeline):
-        with pull_sample(sink) as (sample, data, pts):
+        with pull_sample(sink) as (sample, data):
             process(data, caps_size(sample.get_caps()))
         return Gst.FlowReturn.OK
     return callback
@@ -211,7 +210,7 @@ def on_sink_eos(sink, pipeline):
         overlay.set_eos()
 
 def on_new_sample(sink, pipeline, render_overlay, layout, images, get_command):
-    with pull_sample(sink) as (sample, data, pts):
+    with pull_sample(sink) as (sample, data):
         custom_command = None
         save_frame = False
 
@@ -229,9 +228,9 @@ def on_new_sample(sink, pipeline, render_overlay, layout, images, get_command):
 
         svg = render_overlay(np.frombuffer(data, dtype=np.uint8),
                              command=custom_command)
-        overlay = pipeline.get_by_name('overlay')
-        if overlay:
-            overlay.emit('queue-svg', svg, pts)
+        glsink = pipeline.get_by_name('glsink')
+        if glsink:
+            glsink.set_property('svg', svg)
 
         if save_frame:
             images.put((data, layout.inference_size, svg))
@@ -307,9 +306,8 @@ def run_pipeline(pipeline, layout, loop, render_overlay, display, handle_sigint=
 
     if display is not Display.NONE:
         # Needed to commit the wayland sub-surface.
-        def on_gl_draw(sink, context, sample, widget):
+        def on_gl_draw(sink, widget):
             widget.queue_draw()
-            return False
 
         # Needed to account for window chrome etc.
         def on_widget_configure(widget, event, glsink):
@@ -317,14 +315,6 @@ def run_pipeline(pipeline, layout, loop, render_overlay, display, handle_sigint=
             glsink.set_render_rectangle(allocation.x, allocation.y,
                     allocation.width, allocation.height)
             return False
-
-        # Listens for and drops RECONFIGURE events from glimagesink to avoid costly memory
-        # reallocations when window size changes. These aren't needed in our use case.
-        def on_event_probe(pad, info, *data):
-            event = info.get_event()
-            if event.type == Gst.EventType.RECONFIGURE:
-                return Gst.PadProbeReturn.DROP
-            return Gst.PadProbeReturn.OK
 
         window = Gtk.Window(Gtk.WindowType.TOPLEVEL)
         window.set_title(WINDOW_TITLE)
@@ -337,9 +327,16 @@ def run_pipeline(pipeline, layout, loop, render_overlay, display, handle_sigint=
         drawing_area.realize()
 
         glsink = pipeline.get_by_name('glsink')
-        glsink.get_static_pad('sink').add_probe(Gst.PadProbeType.EVENT_UPSTREAM, on_event_probe)
-        glsink.connect('client-draw', on_gl_draw, drawing_area)
-        set_display_contexts(glsink, drawing_area)
+        glsink.connect('drawn', on_gl_draw, drawing_area)
+
+        # Wayland window handle.
+        wl_handle = glsink.get_wayland_window_handle(drawing_area)
+        glsink.set_window_handle(wl_handle)
+
+        # Wayland display context wrapped as a GStreamer context.
+        wl_display = glsink.get_default_wayland_display_context()
+        glsink.set_context(wl_display)
+
         drawing_area.connect('configure-event', on_widget_configure, glsink)
         window.connect('delete-event', Gtk.main_quit)
         window.show_all()

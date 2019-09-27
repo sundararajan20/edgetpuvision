@@ -27,25 +27,14 @@ def v4l2_src(fmt):
              framerate='%d/%d' % fmt.framerate),
     ]
 
-def display_sink(sync=False, qos=False):
-    return Sink('glimage', sync=sync, qos=qos, name='glsink'),
+def display_sink():
+    return Sink('glsvgoverlay', name='glsink'),
 
 def h264_sink():
     return Sink('app', name='h264sink', emit_signals=True, max_buffers=1, drop=False, sync=False)
 
 def inference_pipeline(layout, stillimage=False):
     size = max_inner_size(layout.render_size, layout.inference_size)
-    if stillimage:
-        return [
-            Filter('videoconvert'),
-            Filter('videoscale'),
-            Caps('video/x-raw', format='RGB', width=size.width, height=size.height),
-            Filter('videobox', autocrop=True),
-            Caps('video/x-raw', width=layout.inference_size.width, height=layout.inference_size.height),
-            Filter('imagefreeze'),
-            Sink('app', name='appsink', emit_signals=True, max_buffers=1, drop=True, sync=False),
-        ]
-
     return [
         Filter('glupload'),
         Filter('glbox'),
@@ -57,38 +46,28 @@ def inference_pipeline(layout, stillimage=False):
 # Display
 def image_display_pipeline(filename, layout):
     return (
-        [Filter('glvideomixer', name='mixer', background='black'),
-         display_sink(sync=False)],
         [decoded_file_src(filename),
+         Filter('imagefreeze'),
+         Caps('video/x-raw', framerate='30/1'),
+         Filter('glupload'),
          Tee(name='t')],
         [Pad('t'),
          Queue(),
-         Filter('videoconvert'),
-         Filter('videoscale'),
-         Caps('video/x-raw', format='RGBA', width=layout.render_size.width, height=layout.render_size.height),
-         Filter('imagefreeze'),
-         Filter('glupload'),
-         Pad('mixer')],
-        [Source('glsvgoverlay', name='overlay', width=layout.render_size.width, height=layout.render_size.height),
-         Pad('mixer')],
+         display_sink()],
         [Pad('t'),
-         Queue(),
-         inference_pipeline(layout, stillimage=True)],
+         Queue(max_size_buffers=1, leaky='downstream'),
+         inference_pipeline(layout)],
     )
 
 
 def video_display_pipeline(filename, layout):
     return (
-        [Filter('glvideomixer', name='mixer', background='black'),
-         display_sink(sync=True)],
         [decoded_file_src(filename),
          Filter('glupload'),
          Tee(name='t')],
         [Pad('t'),
          Queue(),
-         Pad('mixer')],
-        [Source('glsvgoverlay', name='overlay', width=layout.render_size.width, height=layout.render_size.height),
-         Pad('mixer')],
+         display_sink()],
         [Pad('t'),
          Queue(max_size_buffers=1, leaky='downstream'),
          inference_pipeline(layout)],
@@ -96,16 +75,12 @@ def video_display_pipeline(filename, layout):
 
 def camera_display_pipeline(fmt, layout):
     return (
-        [Filter('glvideomixer', name='mixer', background='black'),
-         display_sink(sync=False)],
         [v4l2_src(fmt),
          Filter('glupload'),
          Tee(name='t')],
         [Pad('t'),
          Queue(),
-         Pad('mixer')],
-        [Source('glsvgoverlay', name='overlay', width=layout.render_size.width, height=layout.render_size.height),
-         Pad('mixer')],
+         display_sink()],
         [Pad(name='t'),
          Queue(max_size_buffers=1, leaky='downstream'),
          inference_pipeline(layout)],
