@@ -37,7 +37,7 @@ CSS_STYLES = str(svg.CssStyle({'.back': svg.Style(fill='black',
                                                   stroke_width='0.5em')}))
 
 def size_em(length):
-    return '%sem' % str(0.6 * length)
+    return '%sem' % str(0.6 * (length + 1))
 
 def overlay(title, results, inference_time, inference_rate, layout):
     x0, y0, width, height = layout.window

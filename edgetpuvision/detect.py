@@ -54,7 +54,7 @@ Object = collections.namedtuple('Object', ('id', 'label', 'score', 'bbox'))
 Object.__str__ = lambda self: 'Object(id=%d, label=%s, score=%.2f, %s)' % self
 
 def size_em(length):
-    return '%sem' % str(0.6 * length)
+    return '%sem' % str(0.6 * (length + 1))
 
 def color(i, total):
     return tuple(int(255.0 * c) for c in colorsys.hsv_to_rgb(i / total, 1.0, 1.0))
