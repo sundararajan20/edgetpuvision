@@ -36,11 +36,12 @@ from OpenGL.arrays.arraydatatype import ArrayDatatype
 from OpenGL.GLES3 import (
     glActiveTexture, glBindBuffer, glBindTexture, glBindVertexArray, glBlendEquation, glBlendFunc,
     glBufferData, glDeleteBuffers, glDeleteVertexArrays, glDisable, glDrawElements, glEnable,
-    glEnableVertexAttribArray, glGenBuffers, glGenVertexArrays, glVertexAttribPointer,glViewport)
+    glEnableVertexAttribArray, glGenBuffers, glGenVertexArrays, glGetUniformLocation,
+    glUniformMatrix4fv, glVertexAttribPointer, glViewport)
 from OpenGL.GLES3 import (
     GL_ARRAY_BUFFER, GL_BLEND, GL_ELEMENT_ARRAY_BUFFER, GL_FALSE, GL_FLOAT, GL_FUNC_ADD,
     GL_ONE_MINUS_SRC_ALPHA, GL_SRC_ALPHA, GL_STATIC_DRAW, GL_TEXTURE0, GL_TEXTURE_2D,
-    GL_TRIANGLES, GL_UNSIGNED_SHORT)
+    GL_TRIANGLES, GL_UNSIGNED_SHORT, GL_VERTEX_SHADER)
 
 # Gst.Buffer.map(Gst.MapFlags.WRITE) is broken, this is a workaround. See
 # http://lifestyletransfer.com/how-to-make-gstreamer-buffer-writable-in-python/
@@ -130,6 +131,18 @@ def _get_gl_texture_id(buf):
     assert GstGL.is_gl_memory(memory)
     return libgstgl.gst_gl_memory_get_texture_id(hash(memory))
 
+VERTEX_SHADER_SRC = '''
+    uniform mat4 u_transformation;
+    attribute vec4 a_position;
+    attribute vec2 a_texcoord;
+    varying vec2 v_texcoord;
+    void main()
+    {
+       gl_Position = u_transformation * a_position;
+       v_texcoord = a_texcoord;
+    }
+'''
+
 POSITIONS = numpy.array([
          1.0,  1.0,
         -1.0,  1.0,
@@ -147,6 +160,27 @@ TEXCOORDS = numpy.array([
 INDICES = numpy.array([
          0, 1, 2, 0, 2, 3
     ], dtype=numpy.uint16)
+
+IDENTITY_MATRIX = numpy.array([
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ], dtype=numpy.float16)
+
+HFLIP_MATRIX = numpy.array([
+        [-1.0, 0.0, 0.0, 0.0],
+        [ 0.0, 1.0, 0.0, 0.0],
+        [ 0.0, 0.0, 1.0, 0.0],
+        [ 0.0, 0.0, 0.0, 1.0],
+    ], dtype=numpy.float16)
+
+VFLIP_MATRIX = numpy.array([
+      [1.0,  0.0, 0.0, 0.0],
+      [0.0, -1.0, 0.0, 0.0],
+      [0.0,  0.0, 1.0, 0.0],
+      [0.0,  0.0, 0.0, 1.0],
+    ], dtype=numpy.float16)
 
 NUM_BUFFERS = 2
 
@@ -221,6 +255,12 @@ class GlSvgOverlaySink(Gst.Bin, GstVideo.VideoOverlay):
             '',
             GObject.ParamFlags.WRITABLE
             ),
+        'rotate-method': (str,
+            'Rotate method',
+            'Rotate method according to glimagesink',
+            'none',
+            GObject.ParamFlags.WRITABLE
+            ),
         }
     __gsignals__ = {
         'drawn': (GObject.SignalFlags.RUN_LAST, None, ())
@@ -233,6 +273,7 @@ class GlSvgOverlaySink(Gst.Bin, GstVideo.VideoOverlay):
         self.positions_buffer = 0
         self.texcoords_buffer = 0
         self.vbo_indices = 0
+        self.u_transformation = 0
         self.glcontext = None
         self.glimagesink = Gst.ElementFactory.make('glimagesink')
         self.add(self.glimagesink)
@@ -241,12 +282,15 @@ class GlSvgOverlaySink(Gst.Bin, GstVideo.VideoOverlay):
         self.glimagesink.connect('client-reshape', self.on_reshape)
         self.glimagesink.get_static_pad('sink').add_probe(
             Gst.PadProbeType.EVENT_UPSTREAM, self.on_glimagesink_event)
+        self.get_static_pad('sink').add_probe(
+            Gst.PadProbeType.QUERY_DOWNSTREAM, self.on_downstream_query)
         self.render_thread = None
         self.cond = threading.Condition()
         self.rendering = False
         self.svg = None
         self.buffers = [None] * NUM_BUFFERS
         self.index = 0
+        self.matrix = IDENTITY_MATRIX
 
         self.print_fps = int(os.environ.get('PRINT_FPS', '0'))
         self.incoming_frames = 0
@@ -274,6 +318,27 @@ class GlSvgOverlaySink(Gst.Bin, GstVideo.VideoOverlay):
         event = info.get_event()
         if event.type == Gst.EventType.RECONFIGURE:
             return Gst.PadProbeReturn.DROP
+        return Gst.PadProbeReturn.OK
+
+    def on_downstream_query(self, pad, info):
+        query = info.get_query()
+        if query.type == Gst.QueryType.ALLOCATION:
+            # Ask glimagesink, but remove the metas we don't support.
+            # Need to fiddle with refcount as Python bindings are buggy.
+            # refcount is really 1, but Python took another ref making
+            # it 2 and hence query is 'not writable'.
+            assert query.mini_object.refcount == 2
+            try:
+                query.mini_object.refcount = 1
+                if self.glimagesink.get_static_pad('sink').query(query):
+                    for i in reversed(range(0, query.get_n_allocation_metas())):
+                        gtype, params = query.parse_nth_allocation_meta(i)
+                        if (gtype.name == 'GstVideoAffineTransformationAPI' or
+                            gtype.name == 'GstVideoOverlayCompositionMetaAPI'):
+                            query.remove_nth_allocation_meta(i)
+                    return Gst.PadProbeReturn.HANDLED
+            finally:
+                query.mini_object.refcount = 2
         return Gst.PadProbeReturn.OK
 
     def on_glimagesink_event(self, pad, info):
@@ -331,8 +396,21 @@ class GlSvgOverlaySink(Gst.Bin, GstVideo.VideoOverlay):
                 self.incoming_overlays += 1
                 self.svg = value or ''
                 self.cond.notify_all()
+        elif prop.name == 'rotate-method':
+            value = int(value) if value.isnumeric() else value
+            self.glimagesink.set_property(prop.name, value)
+            value = int(self.glimagesink.get_property(prop.name))
+            if value == 0:
+                self.matrix = IDENTITY_MATRIX
+            elif value == 4:
+                self.matrix = HFLIP_MATRIX
+            elif value == 5:
+                self.matrix = VFLIP_MATRIX
+            else:
+                Gst.warning('Unsupported rotate-method')
+                self.matrix = IDENTITY_MATRIX
         else:
-            self.glimagesink.set_property(prop, value)
+            self.glimagesink.set_property(prop.name, value)
 
     def do_get_property(self, prop):
         return self.glimagesink.get_property(prop)
@@ -341,7 +419,20 @@ class GlSvgOverlaySink(Gst.Bin, GstVideo.VideoOverlay):
         assert not self.shader
         assert glcontext == self.glcontext
 
-        self.shader = GstGL.GLShader.new_default(self.glcontext)
+        frag_stage = GstGL.GLSLStage.new_default_fragment(self.glcontext)
+        vert_stage = GstGL.GLSLStage.new_with_string(self.glcontext,
+            GL_VERTEX_SHADER,
+            GstGL.GLSLVersion.NONE,
+            GstGL.GLSLProfile.COMPATIBILITY | GstGL.GLSLProfile.ES,
+            VERTEX_SHADER_SRC)
+        self.shader = GstGL.GLShader.new(self.glcontext)
+        self.shader.compile_attach_stage(vert_stage)
+        self.shader.compile_attach_stage(frag_stage)
+        self.shader.link()
+
+        self.u_transformation = glGetUniformLocation.baseFunction(
+            self.shader.get_program_handle(), 'u_transformation')
+
         a_position = self.shader.get_attribute_location('a_position')
         a_texcoord = self.shader.get_attribute_location('a_texcoord')
 
@@ -432,6 +523,7 @@ class GlSvgOverlaySink(Gst.Bin, GstVideo.VideoOverlay):
 
         self.shader.use()
         self.shader.set_uniform_1i('frame', 0)
+        glUniformMatrix4fv(self.u_transformation, 1, GL_FALSE, self.matrix)
 
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, None)
 
@@ -440,6 +532,7 @@ class GlSvgOverlaySink(Gst.Bin, GstVideo.VideoOverlay):
             glEnable(GL_BLEND)
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
             glBlendEquation(GL_FUNC_ADD)
+            glUniformMatrix4fv(self.u_transformation, 1, GL_FALSE, IDENTITY_MATRIX)
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, None)
 
         glActiveTexture(GL_TEXTURE0)
