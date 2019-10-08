@@ -36,9 +36,7 @@ def h264_sink():
 def inference_pipeline(layout, stillimage=False):
     size = max_inner_size(layout.render_size, layout.inference_size)
     return [
-        Filter('glupload'),
-        Filter('glbox'),
-        Filter('gldownload'),
+        Filter('glfilterbin', filter='glbox'),
         Caps('video/x-raw', format='RGB', width=layout.inference_size.width, height=layout.inference_size.height),
         Sink('app', name='appsink', emit_signals=True, max_buffers=1, drop=True, sync=False),
     ]

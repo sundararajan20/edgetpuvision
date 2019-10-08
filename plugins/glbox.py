@@ -37,8 +37,7 @@ from OpenGL.GLES3 import (
 SINK_CAPS = 'video/x-raw(memory:GLMemory),format=RGBA,width=[1,{max_int}],height=[1,{max_int}],texture-target=2D'
 SINK_CAPS = Gst.Caps.from_string(SINK_CAPS.format(max_int=GLib.MAXINT))
 
-SRC_CAPS = 'video/x-raw(memory:GLMemory),format=RGB,width=[1,{max_int}],height=[1,{max_int}],texture-target=2D'
-SRC_CAPS += '; video/x-raw(memory:GLMemory),format=RGBA,width=[1,{max_int}],height=[1,{max_int}],texture-target=2D'
+SRC_CAPS = 'video/x-raw(memory:GLMemory),format=RGBA,width=[1,{max_int}],height=[1,{max_int}],texture-target=2D'
 SRC_CAPS = Gst.Caps.from_string(SRC_CAPS.format(max_int=GLib.MAXINT))
 
 VERTEX_SHADER = '''
