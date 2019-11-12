@@ -413,7 +413,7 @@ class GlSvgOverlaySink(Gst.Bin, GstVideo.VideoOverlay):
             self.glimagesink.set_property(prop.name, value)
 
     def do_get_property(self, prop):
-        return self.glimagesink.get_property(prop)
+        return self.glimagesink.get_property(prop.name)
 
     def init_gl(self, glcontext):
         assert not self.shader
@@ -655,4 +655,4 @@ class GlSvgOverlaySink(Gst.Bin, GstVideo.VideoOverlay):
         return gst_context
 
 
-__gstelementfactory__ = ("glsvgoverlaysink", Gst.Rank.NONE, GlSvgOverlaySink)
+__gstelementfactory__ = ('glsvgoverlaysink', Gst.Rank.NONE, GlSvgOverlaySink)
