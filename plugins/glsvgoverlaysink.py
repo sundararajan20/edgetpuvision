@@ -261,6 +261,32 @@ class GlSvgOverlaySink(Gst.Bin, GstVideo.VideoOverlay):
             'none',
             GObject.ParamFlags.WRITABLE
             ),
+        'qos': (bool,
+            'Generate Quality-of-Service events upstream',
+            'Generate Quality-of-Service events upstream',
+            True,
+            GObject.ParamFlags.READWRITE
+            ),
+        'sync': (bool,
+            'Sync on the clock',
+            'Sync on the clock',
+            True,
+            GObject.ParamFlags.READWRITE
+            ),
+        'max-lateness': (int,
+            'Maximum frame lateness (ns)',
+            'Maximum number of nanoseconds that a buffer can be late before it is dropped (-1 unlimited)',
+            -1,
+            GLib.MAXINT,
+            20000000,
+            GObject.ParamFlags.READWRITE
+            ),
+        'fullscreen': (bool,
+            'Fullscreen',
+            'Requests that internally created windows are fullscreen',
+            False,
+            GObject.ParamFlags.READWRITE
+            ),
         }
     __gsignals__ = {
         'drawn': (GObject.SignalFlags.RUN_LAST, None, ())
