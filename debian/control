@@ -4,7 +4,7 @@ Section: python
 Priority: optional
 Build-Depends: dh-python, python3-setuptools, python3-all, debhelper (>= 9), libgstreamer1.0-dev, pkg-config
 Standards-Version: 3.9.8
-Homepage: https://coral.withgoogle.com/
+Homepage: https://coral.ai/
 
 Package: python3-edgetpuvision
 Architecture: any
