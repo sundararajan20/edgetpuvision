@@ -27,11 +27,11 @@ from gi.repository import GLib, GObject, Gst, GstGL, GstVideo
 from OpenGL.arrays.arraydatatype import ArrayDatatype
 from OpenGL.GLES3 import (
     glActiveTexture, glBindBuffer, glBindTexture, glBindVertexArray, glBufferData, glDeleteBuffers,
-    glDeleteVertexArrays, glDrawElements, glEnableVertexAttribArray, glGenBuffers,
-    glGenVertexArrays, glVertexAttribPointer)
+    glClear, glClearColor, glDeleteVertexArrays, glDrawElements, glEnableVertexAttribArray,
+    glGenBuffers, glGenVertexArrays, glVertexAttribPointer)
 from OpenGL.GLES3 import (
-    GL_ARRAY_BUFFER, GL_ELEMENT_ARRAY_BUFFER, GL_FALSE, GL_FLOAT, GL_STATIC_DRAW, GL_TEXTURE0,
-    GL_TEXTURE_2D, GL_TRIANGLES, GL_UNSIGNED_SHORT, GL_VERTEX_SHADER)
+    GL_ARRAY_BUFFER, GL_COLOR_BUFFER_BIT,GL_ELEMENT_ARRAY_BUFFER, GL_FALSE, GL_FLOAT,
+    GL_STATIC_DRAW, GL_TEXTURE0, GL_TEXTURE_2D, GL_TRIANGLES, GL_UNSIGNED_SHORT, GL_VERTEX_SHADER)
 
 
 SINK_CAPS = 'video/x-raw(memory:GLMemory),format=RGBA,width=[1,{max_int}],height=[1,{max_int}],texture-target=2D'
@@ -272,6 +272,10 @@ class GlBox(GstGL.GLFilter):
         return True
 
     def do_render(self, filter, in_tex):
+        # Black borders.
+        glClearColor(0.0, 0.0, 0.0, 0.0)
+        glClear(GL_COLOR_BUFFER_BIT)
+
         glBindVertexArray(self.vao_id)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, in_tex.tex_id)
