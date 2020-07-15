@@ -200,9 +200,9 @@ class GlBox(GstGL.GLFilter):
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.vbo_indices_buffer);
         glBindBuffer(GL_ARRAY_BUFFER, self.positions_buffer);
-        glVertexAttribPointer.baseFunction(a_position, 2, GL_FLOAT, GL_FALSE, 0, None)
+        glVertexAttribPointer.wrappedOperation(a_position, 2, GL_FLOAT, GL_FALSE, 0, None)
         glBindBuffer(GL_ARRAY_BUFFER, self.texcoords_buffer);
-        glVertexAttribPointer.baseFunction(a_texcoord, 2, GL_FLOAT, GL_FALSE, 0, None)
+        glVertexAttribPointer.wrappedOperation(a_texcoord, 2, GL_FLOAT, GL_FALSE, 0, None)
         glEnableVertexAttribArray(a_position)
         glEnableVertexAttribArray(a_texcoord)
 

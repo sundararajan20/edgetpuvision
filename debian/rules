@@ -10,4 +10,4 @@ export PYBUILD_NAME=edgetpuvision
 override_dh_install:
 	dh_install
 	install -d $(DESTDIR)
-	install -g 0 -o 0 plugins/*.py $(DESTDIR)
+	install -g 0 -o 0 plugins/python/*.py $(DESTDIR)

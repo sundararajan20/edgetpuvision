@@ -456,7 +456,7 @@ class GlSvgOverlaySink(Gst.Bin, GstVideo.VideoOverlay):
         self.shader.compile_attach_stage(frag_stage)
         self.shader.link()
 
-        self.u_transformation = glGetUniformLocation.baseFunction(
+        self.u_transformation = glGetUniformLocation.wrappedOperation(
             self.shader.get_program_handle(), 'u_transformation')
 
         a_position = self.shader.get_attribute_location('a_position')
@@ -479,9 +479,9 @@ class GlSvgOverlaySink(Gst.Bin, GstVideo.VideoOverlay):
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.vbo_indices);
         glBindBuffer(GL_ARRAY_BUFFER, self.positions_buffer);
-        glVertexAttribPointer.baseFunction(a_position, 2, GL_FLOAT, GL_FALSE, 0, None)
+        glVertexAttribPointer.wrappedOperation(a_position, 2, GL_FLOAT, GL_FALSE, 0, None)
         glBindBuffer(GL_ARRAY_BUFFER, self.texcoords_buffer);
-        glVertexAttribPointer.baseFunction(a_texcoord, 2, GL_FLOAT, GL_FALSE, 0, None)
+        glVertexAttribPointer.wrappedOperation(a_texcoord, 2, GL_FLOAT, GL_FALSE, 0, None)
         glEnableVertexAttribArray(a_position)
         glEnableVertexAttribArray(a_texcoord)
 
