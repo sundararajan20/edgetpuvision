@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='edgetpuvision',
-    version='1.0',
+    version='7.0',
     description='EdgeTPU camera API',
     long_description='API to run inference on image data coming from the camera.',
     author='Coral',
