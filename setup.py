@@ -16,7 +16,7 @@ setup(
         'Pillow>=4.0.0',
         'pygobject>=3.22.0',
         'protobuf>=3.0.0',
-        'edgetpu',
+        'pycoral>=1.0.0',
     ],
     entry_points = {
         'console_scripts': ['edgetpu_classify=edgetpuvision.classify:main',
