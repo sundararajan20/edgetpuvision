@@ -1,3 +1,9 @@
+edgetpuvision (7-1) mendel-eagle; urgency=medium
+
+  * Switching from python3-edgetpu to python3-pycoral.
+
+ -- Coral <coral-support@google.com>  Mon, 09 Nov 2020 16:24:25 -0800
+
 edgetpuvision (6-1) mendel-day; urgency=medium
 
   * Cut for day release.

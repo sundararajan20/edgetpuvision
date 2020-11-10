@@ -20,7 +20,6 @@ Depends: ${misc:Depends},
          gstreamer1.0-plugins-ugly,
          gstreamer1.0-python3-plugin-loader,
          python3-cairo,
-         python3-edgetpu,
          python3-gi,
          python3-gi-cairo,
          python3-gst-1.0,
@@ -28,8 +27,8 @@ Depends: ${misc:Depends},
          python3-numpy,
          python3-pil,
          python3-protobuf,
+         python3-pycoral,
          weston
 Recommends: imx-gst1.0-plugin,
 Description: EdgeTPU camera API
  API to run inference on image data coming from the camera.
-

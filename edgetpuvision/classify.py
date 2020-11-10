@@ -25,7 +25,8 @@ import collections
 import itertools
 import time
 
-from edgetpu.classification.engine import ClassificationEngine
+from pycoral.adapters import classify
+from pycoral.utils import edgetpu
 
 from . import svg
 from . import utils
@@ -109,15 +110,15 @@ def render_gen(args):
 
     fps_counter = utils.avg_fps_counter(30)
 
-    engines, titles = utils.make_engines(args.model, ClassificationEngine)
-    assert utils.same_input_image_sizes(engines)
-    engines = itertools.cycle(engines)
-    engine = next(engines)
+    interpreters, titles = utils.make_interpreters(args.model)
+    assert utils.same_input_image_sizes(interpreters)
+    interpreters = itertools.cycle(interpreters)
+    interpreter = next(interpreters)
 
     labels = utils.load_labels(args.labels)
     draw_overlay = True
 
-    yield utils.input_image_size(engine)
+    yield utils.input_image_size(interpreter)
 
     output = None
     while True:
@@ -126,15 +127,17 @@ def render_gen(args):
         inference_rate = next(fps_counter)
         if draw_overlay:
             start = time.monotonic()
-            results = engine.classify_with_input_tensor(tensor, threshold=args.threshold, top_k=args.top_k)
+            edgetpu.run_inference(interpreter, tensor)
             inference_time = time.monotonic() - start
 
-            results = [(labels[i], score) for i, score in results]
+            classes = classify.get_classes(interpreter, top_k=args.top_k,
+                score_threshold=args.threshold)
+            results = [(labels[class_id], score) for class_id, score in classes]
             results = acc.send(results)
             if args.print:
                 print_results(inference_rate, results)
 
-            title = titles[engine]
+            title = titles[interpreter]
             output = overlay(title, results, inference_time, inference_rate, layout)
         else:
             output = None
@@ -142,7 +145,7 @@ def render_gen(args):
         if command == 'o':
             draw_overlay = not draw_overlay
         elif command == 'n':
-            engine = next(engines)
+            interpreter = next(interpreters)
 
 def add_render_gen_args(parser):
     parser.add_argument('--model', required=True,
