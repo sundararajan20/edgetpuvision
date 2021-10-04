@@ -19,13 +19,11 @@ import time
 
 from pycoral.adapters import common
 from pycoral.utils import edgetpu
+from pycoral.utils import dataset
 
-LABEL_PATTERN = re.compile(r'\s*(\d+)(.+)')
 
 def load_labels(path):
-    with open(path, 'r', encoding='utf-8') as f:
-       lines = (LABEL_PATTERN.match(line).groups() for line in f.readlines())
-       return {int(num): text.strip() for num, text in lines}
+    return dataset.read_label_file(path)
 
 def input_image_size(interpreter):
     return common.input_size(interpreter)

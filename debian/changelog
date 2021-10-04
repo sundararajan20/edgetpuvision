@@ -1,3 +1,9 @@
+edgetpuvision (8-1) mendel-eagle; urgency=medium
+
+  * Use read_label_file from python3-pycoral.
+
+ -- Coral <coral-support@google.com>  Mon, 04 Oct 2021 12:22:57 -0700
+
 edgetpuvision (7-1) mendel-eagle; urgency=medium
 
   * Switching from python3-edgetpu to python3-pycoral.
