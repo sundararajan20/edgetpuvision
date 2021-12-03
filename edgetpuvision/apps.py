@@ -16,15 +16,15 @@ import argparse
 import logging
 import signal
 
-from .camera import make_camera
-from .gstreamer import Display, run_gen
-from .streaming.server import StreamingServer
+from camera import make_camera
+from gstreamer import Display, run_gen
+from streaming.server import StreamingServer
 
-from . import svg
+import svg
 
 EMPTY_SVG = str(svg.Svg())
 
-def run_server(add_render_gen_args, render_gen):
+def run_server(add_render_gen_args, render_gen, stub):
     logging.basicConfig(level=logging.INFO)
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -39,7 +39,7 @@ def run_server(add_render_gen_args, render_gen):
     add_render_gen_args(parser)
     args = parser.parse_args()
 
-    gen = render_gen(args)
+    gen = render_gen(args, stub)
     camera = make_camera(args.source, next(gen), args.loop)
     assert camera is not None
 

@@ -34,9 +34,19 @@ import time
 from pycoral.adapters import detect
 from pycoral.utils import edgetpu
 
-from . import svg
-from . import utils
-from .apps import run_app
+import svg
+import utils
+from apps import run_app
+
+import io
+import numpy as np
+import grpc
+import inferencedata_pb2
+import inferencedata_pb2_grpc
+from PIL import Image
+
+channel = None
+stub = None
 
 CSS_STYLES = str(svg.CssStyle({'.back': svg.Style(fill='black',
                                                   stroke='black',
@@ -122,7 +132,7 @@ def print_results(inference_rate, objs):
     for i, obj in enumerate(objs):
         print('    %d: %s, area=%.2f' % (i, obj, obj.bbox.area))
 
-def render_gen(args):
+def render_gen(args, stub):
     fps_counter  = utils.avg_fps_counter(30)
 
     interpreters, titles = utils.make_interpreters(args.model)
@@ -131,6 +141,7 @@ def render_gen(args):
     interpreter = next(interpreters)
 
     labels = utils.load_labels(args.labels) if args.labels else None
+    labels_to_ids = dict(zip(labels.values(), labels.keys()))
     filtered_labels = set(l.strip() for l in args.filter.split(',')) if args.filter else None
     get_color = make_get_color(args.color, labels)
 
@@ -146,28 +157,57 @@ def render_gen(args):
         inference_rate = next(fps_counter)
         if draw_overlay:
             start = time.monotonic()
-            edgetpu.run_inference(interpreter, tensor)
+            try:
+                reshaped = np.reshape(tensor, (300, 300, 3))
+                img = Image.fromarray(reshaped)
+                img_byte_arr = io.BytesIO()
+                img.save(img_byte_arr, format='JPEG')
+                imagebatch = inferencedata_pb2.ImageBatch()
+                for i in range(1):
+                    imagepb = imagebatch.images.add()
+                    imagepb.id = i + 1
+                    imagepb.image_data = img_byte_arr.getvalue()
+                response = stub.Infer(imagebatch)
+                # print(response)
+            # edgetpu.run_inference(interpreter, tensor)
+                # objs = [
+                #             detect.Object(labels_to_ids[box.label],
+                #                         box.label,
+                #                         detect.BBox(box.xmin, box.ymin, box.xmax, box.ymax))
+                #             for result in response.results for box in result.boxes if (box.score > args.threshold and box.label in filtered_labels)
+                #     ]
+                objs = []
+                for result in response.results:
+                    for box in result.boxes:
+                        if box.score > args.threshold and box.label in filtered_labels:
+                            objs.append(detect.Object(labels_to_ids[box.label], box.score, detect.BBox(box.xmin, box.ymin, box.xmax, box.ymax)))
+
+            except Exception as e:
+                print(e)
             inference_time = time.monotonic() - start
 
-            objs = detect.get_objects(interpreter, args.threshold)[:args.top_k]
-            if labels and filtered_labels:
-                objs = [obj for obj in objs if labels[obj.id] in filtered_labels]
+            # objs = detect.get_objects(interpreter, args.threshold)[:args.top_k]
+            # if labels and filtered_labels:
+            #     objs = [obj for obj in objs if labels[obj.id] in filtered_labels]
 
+            # objs = []
             objs = [obj for obj in objs \
-                    if args.min_area <= obj.bbox.scale(1.0 / width, 1.0 / height).area <= args.max_area]
+                if args.min_area <= obj.bbox.scale(1.0 / width, 1.0 / height).area <= args.max_area]
 
             if args.print:
                 print_results(inference_rate, objs)
 
             title = titles[interpreter]
             output = overlay(title, objs, get_color, labels, inference_time, inference_rate, layout)
+
         else:
             output = None
 
         if command == 'o':
             draw_overlay = not draw_overlay
         elif command == 'n':
-            interpreter = next(interpreters)
+            print("'n' doesn't work with remote inference")
+            # interpreter = next(interpreters)
 
 def add_render_gen_args(parser):
     parser.add_argument('--model',

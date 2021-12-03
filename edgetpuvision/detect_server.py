@@ -26,11 +26,16 @@ python3 -m edgetpuvision.detect_server \
   --labels ${TEST_DATA}/coco_labels.txt
 """
 
-from .apps import run_server
-from .detect import add_render_gen_args, render_gen
+from apps import run_server
+from detect import add_render_gen_args, render_gen
+
+import grpc
+import inferencedata_pb2_grpc
 
 def main():
-    run_server(add_render_gen_args, render_gen)
+    channel = grpc.insecure_channel('ec2-13-57-32-117.us-west-1.compute.amazonaws.com:50051')
+    stub = inferencedata_pb2_grpc.RemoteInferenceStub(channel)
+    run_server(add_render_gen_args, render_gen, stub)
 
 if __name__ == '__main__':
     main()
